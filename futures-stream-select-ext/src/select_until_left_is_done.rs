@@ -86,7 +86,6 @@ where
     }
 }
 
-#[cfg(feature = "alloc")]
 #[cfg(test)]
 mod tests {
     use super::*;
