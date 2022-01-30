@@ -1,0 +1,4 @@
+[workspace]
+members = [
+    "futures-stream-select-ext",
+]

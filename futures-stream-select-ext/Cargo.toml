@@ -1,0 +1,15 @@
+[package]
+name = "futures-stream-select-ext"
+version = "0.0.0"
+authors = ["vkill <vkill.net@gmail.com>"]
+edition = "2021"
+description = "futures::stream::select Ext"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/bk-rs/futures-ext"
+homepage = "https://github.com/bk-rs/futures-ext"
+documentation = "https://docs.rs/futures-stream-select-ext"
+keywords = []
+categories = []
+readme = "README.md"
+
+[dependencies]
