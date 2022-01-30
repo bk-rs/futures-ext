@@ -12,4 +12,18 @@ keywords = []
 categories = []
 readme = "README.md"
 
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = ["std"]
+std = ["alloc", "futures-util/std"]
+alloc = ["futures-util/alloc"]
+
 [dependencies]
+futures-util = { version = "0.3", default-features = false }
+pin-project-lite = { version = "0.2" }
+
+[dev-dependencies]
+futures-executor = { version = "0.3" }
+futures-timer = { version = "3.0" }
