@@ -166,8 +166,19 @@ mod tests {
         last.toggle()
     }
 
+    fn right_right_left(i: &mut usize) -> PollNext {
+        let poll_next = if *i % 3 == 2 {
+            PollNext::Left
+        } else {
+            PollNext::Right
+        };
+
+        *i += 1;
+        poll_next
+    }
+
     #[test]
-    fn test_without_sleep() {
+    fn test_with_round_robin() {
         futures_executor::block_on(async {
             for (range, ret) in vec![
                 (1..=1, vec![1, 0]),
@@ -187,7 +198,30 @@ mod tests {
     }
 
     #[test]
-    fn test_with_right_sleep() {
+    fn test_with_right_right_left() {
+        futures_executor::block_on(async {
+            for (range, ret) in vec![
+                (1..=1, vec![0, 0, 1, 0, 0]),
+                (1..=2, vec![0, 0, 1, 0, 0, 2, 0, 0]),
+                (1..=3, vec![0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0]),
+                (1..=4, vec![0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0]),
+                (
+                    1..=5,
+                    vec![0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0, 5, 0, 0],
+                ),
+            ] {
+                let st1 = stream::iter(range).boxed();
+                let st2 = stream::repeat(0);
+
+                let st = select_until_left_is_done_with_strategy(st1, st2, right_right_left);
+
+                assert_eq!(st.collect::<Vec<_>>().await, ret);
+            }
+        })
+    }
+
+    #[test]
+    fn test_with_round_robin_and_right_long_sleep() {
         futures_executor::block_on(async {
             for (range, ret) in vec![
                 (1..=1, vec![1]),
@@ -218,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn test_with_both_sleep() {
+    fn test_with_round_robin_and_both_sleep() {
         futures_executor::block_on(async {
             for (range, ret_vec) in vec![
                 (1..=1, vec![vec![1]]),
@@ -257,7 +291,7 @@ mod tests {
     }
 
     #[test]
-    fn test_with_both_sleep_2() {
+    fn test_with_round_robin_and_both_sleep_2() {
         futures_executor::block_on(async {
             for (range, ret_vec) in vec![
                 (1..=1, vec![vec![0, 1]]),
@@ -286,6 +320,45 @@ mod tests {
                     .boxed();
 
                 let st = select_until_left_is_done_with_strategy(st1, st2, round_robin);
+
+                #[cfg(feature = "std")]
+                let now = std::time::Instant::now();
+
+                let ret = st.collect::<Vec<_>>().await;
+                #[cfg(feature = "std")]
+                println!("ret {:?}", ret);
+                assert!(ret_vec.contains(&ret));
+
+                #[cfg(feature = "std")]
+                assert!(now.elapsed() < Duration::from_secs(1));
+            }
+        })
+    }
+
+    #[test]
+    fn test_with_right_right_left_and_both_sleep() {
+        futures_executor::block_on(async {
+            for (range, ret_vec) in vec![
+                (1..=1, vec![vec![0, 1]]),
+                (1..=2, vec![vec![0, 1, 0, 0, 2]]),
+                (1..=3, vec![vec![0, 1, 0, 0, 2, 3]]),
+                (1..=4, vec![vec![0, 1, 0, 0, 2, 3, 4]]),
+                (1..=5, vec![vec![0, 1, 0, 0, 2, 3, 4, 5]]),
+            ] {
+                let st1 = stream::iter(range)
+                    .then(|n| async move {
+                        futures_timer::Delay::new(Duration::from_millis(60)).await;
+                        n
+                    })
+                    .boxed();
+                let st2 = stream::iter(vec![0, 0, 0])
+                    .then(|n| async move {
+                        futures_timer::Delay::new(Duration::from_millis(35)).await;
+                        n
+                    })
+                    .boxed();
+
+                let st = select_until_left_is_done_with_strategy(st1, st2, right_right_left);
 
                 #[cfg(feature = "std")]
                 let now = std::time::Instant::now();
