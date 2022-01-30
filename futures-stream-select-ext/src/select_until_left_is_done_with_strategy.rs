@@ -233,7 +233,7 @@ mod tests {
                 let st1 = stream::iter(range).boxed();
                 let st2 = stream::repeat(0)
                     .then(|n| async move {
-                        futures_timer::Delay::new(Duration::from_secs(5)).await;
+                        async_timer::interval(Duration::from_secs(5)).wait().await;
                         n
                     })
                     .boxed();
@@ -263,13 +263,17 @@ mod tests {
             ] {
                 let st1 = stream::iter(range)
                     .then(|n| async move {
-                        futures_timer::Delay::new(Duration::from_millis(100)).await;
+                        async_timer::interval(Duration::from_millis(100))
+                            .wait()
+                            .await;
                         n
                     })
                     .boxed();
                 let st2 = stream::repeat(0)
                     .then(|n| async move {
-                        futures_timer::Delay::new(Duration::from_millis(160)).await;
+                        async_timer::interval(Duration::from_millis(160))
+                            .wait()
+                            .await;
                         n
                     })
                     .boxed();
@@ -308,13 +312,17 @@ mod tests {
             ] {
                 let st1 = stream::iter(range)
                     .then(|n| async move {
-                        futures_timer::Delay::new(Duration::from_millis(140)).await;
+                        async_timer::interval(Duration::from_millis(140))
+                            .wait()
+                            .await;
                         n
                     })
                     .boxed();
                 let st2 = stream::repeat(0)
                     .then(|n| async move {
-                        futures_timer::Delay::new(Duration::from_millis(100)).await;
+                        async_timer::interval(Duration::from_millis(100))
+                            .wait()
+                            .await;
                         n
                     })
                     .boxed();
@@ -347,13 +355,17 @@ mod tests {
             ] {
                 let st1 = stream::iter(range)
                     .then(|n| async move {
-                        futures_timer::Delay::new(Duration::from_millis(60)).await;
+                        async_timer::interval(Duration::from_millis(60))
+                            .wait()
+                            .await;
                         n
                     })
                     .boxed();
                 let st2 = stream::iter(vec![0, 0, 0])
                     .then(|n| async move {
-                        futures_timer::Delay::new(Duration::from_millis(35)).await;
+                        async_timer::interval(Duration::from_millis(35))
+                            .wait()
+                            .await;
                         n
                     })
                     .boxed();
