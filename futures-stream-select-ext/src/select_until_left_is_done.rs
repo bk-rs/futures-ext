@@ -16,6 +16,7 @@ use crate::select_until_left_is_done_with_strategy::{
 //
 pin_project! {
     /// Stream for the [`select_until_left_is_done()`] function. See function docs for details.
+    #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
     pub struct SelectUntilLeftIsDone<St1, St2> {
         #[pin]
