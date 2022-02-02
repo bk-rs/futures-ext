@@ -22,7 +22,7 @@ pin_project! {
     #[must_use = "streams do nothing unless polled"]
     pub struct SelectUntilLeftIsDoneWithStrategy<St1, St2, Clos, State> {
         #[pin]
-        inner: Inner<St1, St2, State>,
+        inner: Inner<St1, St2, PollNext>,
         abort_handle: AbortHandle,
         state: State,
         clos: Clos,
@@ -44,7 +44,7 @@ where
     let (stream2, abort_handle) = abortable(stream2);
 
     SelectUntilLeftIsDoneWithStrategy {
-        inner: select_with_strategy(stream1, stream2, |_| unreachable!()),
+        inner: select_with_strategy(stream1, stream2, |last| last.toggle()),
         abort_handle,
         state: Default::default(),
         clos: which,
@@ -250,6 +250,7 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_with_round_robin_and_both_sleep() {
         futures_executor::block_on(async {
@@ -262,7 +263,7 @@ mod tests {
             ] {
                 let st1 = stream::iter(range)
                     .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(100))
+                        async_timer::interval(Duration::from_millis(10))
                             .wait()
                             .await;
                         n
@@ -270,7 +271,7 @@ mod tests {
                     .boxed();
                 let st2 = stream::repeat(0)
                     .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(160))
+                        async_timer::interval(Duration::from_millis(16))
                             .wait()
                             .await;
                         n
@@ -293,6 +294,7 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_with_round_robin_and_both_sleep_2() {
         futures_executor::block_on(async {
@@ -311,7 +313,7 @@ mod tests {
             ] {
                 let st1 = stream::iter(range)
                     .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(140))
+                        async_timer::interval(Duration::from_millis(14))
                             .wait()
                             .await;
                         n
@@ -319,7 +321,7 @@ mod tests {
                     .boxed();
                 let st2 = stream::repeat(0)
                     .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(100))
+                        async_timer::interval(Duration::from_millis(10))
                             .wait()
                             .await;
                         n
