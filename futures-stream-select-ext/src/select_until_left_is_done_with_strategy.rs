@@ -157,7 +157,6 @@ mod tests {
     use super::*;
 
     use alloc::{vec, vec::Vec};
-    use core::time::Duration;
 
     use futures_util::{stream, StreamExt as _};
 
@@ -219,171 +218,149 @@ mod tests {
         })
     }
 
-    #[test]
-    fn test_with_round_robin_and_right_long_sleep() {
-        futures_executor::block_on(async {
-            for (range, ret) in vec![
-                (1..=1, vec![1]),
-                (1..=2, vec![1, 2]),
-                (1..=3, vec![1, 2, 3]),
-                (1..=4, vec![1, 2, 3, 4]),
-                (1..=5, vec![1, 2, 3, 4, 5]),
-            ] {
-                let st1 = stream::iter(range).boxed();
-                let st2 = stream::repeat(0)
-                    .then(|n| async move {
-                        async_timer::interval(Duration::from_secs(5)).wait().await;
-                        n
-                    })
-                    .boxed();
+    #[tokio::test]
+    async fn test_with_round_robin_and_right_long_sleep() {
+        for (range, ret) in vec![
+            (1..=1, vec![1]),
+            (1..=2, vec![1, 2]),
+            (1..=3, vec![1, 2, 3]),
+            (1..=4, vec![1, 2, 3, 4]),
+            (1..=5, vec![1, 2, 3, 4, 5]),
+        ] {
+            let st1 = stream::iter(range).boxed();
+            let st2 = stream::repeat(0)
+                .then(|n| async move {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    n
+                })
+                .boxed();
 
-                let st = select_until_left_is_done_with_strategy(st1, st2, round_robin);
+            let st = select_until_left_is_done_with_strategy(st1, st2, round_robin);
 
-                #[cfg(feature = "std")]
-                let now = std::time::Instant::now();
+            #[cfg(feature = "std")]
+            let now = std::time::Instant::now();
 
-                assert_eq!(st.collect::<Vec<_>>().await, ret);
+            assert_eq!(st.collect::<Vec<_>>().await, ret);
 
-                #[cfg(feature = "std")]
-                assert!(now.elapsed() < Duration::from_secs(1));
-            }
-        })
+            #[cfg(feature = "std")]
+            assert!(now.elapsed() < core::time::Duration::from_secs(1));
+        }
     }
 
-    #[cfg(feature = "std")]
-    #[test]
-    fn test_with_round_robin_and_both_sleep() {
-        futures_executor::block_on(async {
-            for (range, ret_vec) in vec![
-                (1..=1, vec![vec![1]]),
-                (1..=2, vec![vec![1, 0, 2]]),
-                (1..=3, vec![vec![1, 0, 2, 3]]),
-                (1..=4, vec![vec![1, 0, 2, 3, 0, 4]]),
-                (1..=5, vec![vec![1, 0, 2, 3, 0, 4, 0, 5]]),
-            ] {
-                let st1 = stream::iter(range)
-                    .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(10))
-                            .wait()
-                            .await;
-                        n
-                    })
-                    .boxed();
-                let st2 = stream::repeat(0)
-                    .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(16))
-                            .wait()
-                            .await;
-                        n
-                    })
-                    .boxed();
+    #[tokio::test]
+    async fn test_with_round_robin_and_both_sleep() {
+        for (range, ret_vec) in vec![
+            (1..=1, vec![vec![1]]),
+            (1..=2, vec![vec![1, 0, 2]]),
+            (1..=3, vec![vec![1, 0, 2, 3]]),
+            (1..=4, vec![vec![1, 0, 2, 3, 0, 4]]),
+            (1..=5, vec![vec![1, 0, 2, 3, 0, 4, 0, 5]]),
+        ] {
+            let st1 = stream::iter(range)
+                .then(|n| async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    n
+                })
+                .boxed();
+            let st2 = stream::repeat(0)
+                .then(|n| async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(160)).await;
+                    n
+                })
+                .boxed();
 
-                let st = select_until_left_is_done_with_strategy(st1, st2, round_robin);
+            let st = select_until_left_is_done_with_strategy(st1, st2, round_robin);
 
-                #[cfg(feature = "std")]
-                let now = std::time::Instant::now();
+            #[cfg(feature = "std")]
+            let now = std::time::Instant::now();
 
-                let ret = st.collect::<Vec<_>>().await;
-                #[cfg(feature = "std")]
-                println!("ret {:?}", ret);
-                assert!(ret_vec.contains(&ret));
+            let ret = st.collect::<Vec<_>>().await;
+            #[cfg(feature = "std")]
+            println!("ret {:?}", ret);
+            assert!(ret_vec.contains(&ret));
 
-                #[cfg(feature = "std")]
-                assert!(now.elapsed() < Duration::from_secs(1));
-            }
-        })
+            #[cfg(feature = "std")]
+            assert!(now.elapsed() < core::time::Duration::from_secs(1));
+        }
     }
 
-    #[cfg(feature = "std")]
-    #[test]
-    fn test_with_round_robin_and_both_sleep_2() {
-        futures_executor::block_on(async {
-            for (range, ret_vec) in vec![
-                (1..=1, vec![vec![0, 1]]),
-                (1..=2, vec![vec![0, 1, 0, 2]]),
-                (1..=3, vec![vec![0, 1, 0, 2, 0, 0, 3]]),
-                (1..=4, vec![vec![0, 1, 0, 2, 0, 0, 3, 0, 4]]),
-                (
-                    1..=5,
-                    vec![
-                        vec![0, 1, 0, 2, 0, 0, 3, 0, 4, 0, 0, 5],
-                        vec![0, 1, 0, 2, 0, 0, 3, 0, 4, 0, 5],
-                    ],
-                ),
-            ] {
-                let st1 = stream::iter(range)
-                    .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(14))
-                            .wait()
-                            .await;
-                        n
-                    })
-                    .boxed();
-                let st2 = stream::repeat(0)
-                    .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(10))
-                            .wait()
-                            .await;
-                        n
-                    })
-                    .boxed();
+    #[tokio::test]
+    async fn test_with_round_robin_and_both_sleep_2() {
+        for (range, ret_vec) in vec![
+            (1..=1, vec![vec![0, 1]]),
+            (1..=2, vec![vec![0, 1, 0, 2]]),
+            (1..=3, vec![vec![0, 1, 0, 2, 0, 0, 3]]),
+            (1..=4, vec![vec![0, 1, 0, 2, 0, 0, 3, 0, 4]]),
+            (
+                1..=5,
+                vec![
+                    vec![0, 1, 0, 2, 0, 0, 3, 0, 4, 0, 0, 5],
+                    vec![0, 1, 0, 2, 0, 0, 3, 0, 4, 0, 5],
+                ],
+            ),
+        ] {
+            let st1 = stream::iter(range)
+                .then(|n| async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(140)).await;
+                    n
+                })
+                .boxed();
+            let st2 = stream::repeat(0)
+                .then(|n| async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    n
+                })
+                .boxed();
 
-                let st = select_until_left_is_done_with_strategy(st1, st2, round_robin);
+            let st = select_until_left_is_done_with_strategy(st1, st2, round_robin);
 
-                #[cfg(feature = "std")]
-                let now = std::time::Instant::now();
+            #[cfg(feature = "std")]
+            let now = std::time::Instant::now();
 
-                let ret = st.collect::<Vec<_>>().await;
-                #[cfg(feature = "std")]
-                println!("ret {:?}", ret);
-                assert!(ret_vec.contains(&ret));
+            let ret = st.collect::<Vec<_>>().await;
+            #[cfg(feature = "std")]
+            println!("ret {:?}", ret);
+            assert!(ret_vec.contains(&ret));
 
-                #[cfg(feature = "std")]
-                assert!(now.elapsed() < Duration::from_secs(1));
-            }
-        })
+            #[cfg(feature = "std")]
+            assert!(now.elapsed() < core::time::Duration::from_secs(1));
+        }
     }
 
-    #[test]
-    fn test_with_right_right_left_and_both_sleep() {
-        futures_executor::block_on(async {
-            for (range, ret_vec) in vec![
-                (1..=1, vec![vec![0, 1]]),
-                (1..=2, vec![vec![0, 1, 0, 0, 2]]),
-                (1..=3, vec![vec![0, 1, 0, 0, 2, 3]]),
-                (1..=4, vec![vec![0, 1, 0, 0, 2, 3, 4]]),
-                (1..=5, vec![vec![0, 1, 0, 0, 2, 3, 4, 5]]),
-            ] {
-                let st1 = stream::iter(range)
-                    .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(60))
-                            .wait()
-                            .await;
-                        n
-                    })
-                    .boxed();
-                let st2 = stream::iter(vec![0, 0, 0])
-                    .then(|n| async move {
-                        async_timer::interval(Duration::from_millis(35))
-                            .wait()
-                            .await;
-                        n
-                    })
-                    .boxed();
+    #[tokio::test]
+    async fn test_with_right_right_left_and_both_sleep() {
+        for (range, ret_vec) in vec![
+            (1..=1, vec![vec![0, 1]]),
+            (1..=2, vec![vec![0, 1, 0, 0, 2]]),
+            (1..=3, vec![vec![0, 1, 0, 0, 2, 3]]),
+            (1..=4, vec![vec![0, 1, 0, 0, 2, 3, 4]]),
+            (1..=5, vec![vec![0, 1, 0, 0, 2, 3, 4, 5]]),
+        ] {
+            let st1 = stream::iter(range)
+                .then(|n| async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(60)).await;
+                    n
+                })
+                .boxed();
+            let st2 = stream::iter(vec![0, 0, 0])
+                .then(|n| async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(35)).await;
+                    n
+                })
+                .boxed();
 
-                let st = select_until_left_is_done_with_strategy(st1, st2, right_right_left);
+            let st = select_until_left_is_done_with_strategy(st1, st2, right_right_left);
 
-                #[cfg(feature = "std")]
-                let now = std::time::Instant::now();
+            #[cfg(feature = "std")]
+            let now = std::time::Instant::now();
 
-                let ret = st.collect::<Vec<_>>().await;
-                #[cfg(feature = "std")]
-                println!("ret {:?}", ret);
-                assert!(ret_vec.contains(&ret));
+            let ret = st.collect::<Vec<_>>().await;
+            #[cfg(feature = "std")]
+            println!("ret {:?}", ret);
+            assert!(ret_vec.contains(&ret));
 
-                #[cfg(feature = "std")]
-                assert!(now.elapsed() < Duration::from_secs(1));
-            }
-        })
+            #[cfg(feature = "std")]
+            assert!(now.elapsed() < core::time::Duration::from_secs(1));
+        }
     }
 }

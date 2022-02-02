@@ -26,4 +26,4 @@ pin-project-lite = { version = "0.2" }
 
 [dev-dependencies]
 futures-executor = { version = "0.3" }
-async-timer = { version = "1.0.0-beta" }
+tokio = { version = "1.16", features = ["macros", "rt-multi-thread", "time"] }
