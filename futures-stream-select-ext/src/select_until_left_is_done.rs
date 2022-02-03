@@ -152,4 +152,47 @@ mod tests {
             assert!(now.elapsed() < core::time::Duration::from_secs(1));
         }
     }
+
+    #[tokio::test]
+    async fn test_with_both_sleep_2() {
+        for (range, ret_vec) in vec![
+            (1..=1, vec![vec![0, 1]]),
+            (1..=2, vec![vec![0, 1, 0, 2]]),
+            (1..=3, vec![vec![0, 1, 0, 2, 0, 3]]),
+            (1..=4, vec![vec![0, 1, 0, 2, 0, 3, 0, 4]]),
+            (1..=5, vec![vec![0, 1, 0, 2, 0, 3, 0, 4, 0, 5]]),
+        ] {
+            let st1 = stream::iter(range)
+                .then(|n| async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(55)).await;
+                    n
+                })
+                .boxed();
+            let st2 = stream::unfold(
+                (
+                    0_usize,
+                    tokio::time::interval(tokio::time::Duration::from_millis(50)),
+                ),
+                |(i, mut interval)| async move {
+                    interval.reset();
+                    interval.tick().await;
+                    Some((0, (i + 1, interval)))
+                },
+            )
+            .boxed();
+
+            let st = select_until_left_is_done(st1, st2);
+
+            #[cfg(feature = "std")]
+            let now = std::time::Instant::now();
+
+            let ret = st.collect::<Vec<_>>().await;
+            #[cfg(feature = "std")]
+            println!("ret {:?}", ret);
+            assert!(ret_vec.contains(&ret));
+
+            #[cfg(feature = "std")]
+            assert!(now.elapsed() < core::time::Duration::from_secs(1));
+        }
+    }
 }
