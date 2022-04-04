@@ -2,15 +2,12 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
+use std::io::{Result, SeekFrom};
 
-use futures_io::{
-    AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, IoSlice, IoSliceMut, Result, SeekFrom,
-};
+use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 
 use super::Either;
 
-//
-// https://github.com/rust-lang/futures-rs/blob/0.3.21/futures-util/src/future/either.rs#L191-L296
 //
 impl<A, B> AsyncRead for Either<A, B>
 where
@@ -20,26 +17,16 @@ where
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<Result<()>> {
         match self.project() {
             Either::Left(x) => x.poll_read(cx, buf),
             Either::Right(x) => x.poll_read(cx, buf),
         }
     }
-
-    fn poll_read_vectored(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        bufs: &mut [IoSliceMut<'_>],
-    ) -> Poll<Result<usize>> {
-        match self.project() {
-            Either::Left(x) => x.poll_read_vectored(cx, bufs),
-            Either::Right(x) => x.poll_read_vectored(cx, bufs),
-        }
-    }
 }
 
+//
 impl<A, B> AsyncWrite for Either<A, B>
 where
     A: AsyncWrite,
@@ -52,17 +39,6 @@ where
         }
     }
 
-    fn poll_write_vectored(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        bufs: &[IoSlice<'_>],
-    ) -> Poll<Result<usize>> {
-        match self.project() {
-            Either::Left(x) => x.poll_write_vectored(cx, bufs),
-            Either::Right(x) => x.poll_write_vectored(cx, bufs),
-        }
-    }
-
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         match self.project() {
             Either::Left(x) => x.poll_flush(cx),
@@ -70,27 +46,36 @@ where
         }
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         match self.project() {
-            Either::Left(x) => x.poll_close(cx),
-            Either::Right(x) => x.poll_close(cx),
+            Either::Left(x) => x.poll_shutdown(cx),
+            Either::Right(x) => x.poll_shutdown(cx),
         }
     }
 }
 
+//
 impl<A, B> AsyncSeek for Either<A, B>
 where
     A: AsyncSeek,
     B: AsyncSeek,
 {
-    fn poll_seek(self: Pin<&mut Self>, cx: &mut Context<'_>, pos: SeekFrom) -> Poll<Result<u64>> {
+    fn start_seek(self: Pin<&mut Self>, position: SeekFrom) -> Result<()> {
         match self.project() {
-            Either::Left(x) => x.poll_seek(cx, pos),
-            Either::Right(x) => x.poll_seek(cx, pos),
+            Either::Left(x) => x.start_seek(position),
+            Either::Right(x) => x.start_seek(position),
+        }
+    }
+
+    fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<u64>> {
+        match self.project() {
+            Either::Left(x) => x.poll_complete(cx),
+            Either::Right(x) => x.poll_complete(cx),
         }
     }
 }
 
+//
 impl<A, B> AsyncBufRead for Either<A, B>
 where
     A: AsyncBufRead,

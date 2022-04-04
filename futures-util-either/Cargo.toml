@@ -16,17 +16,22 @@ readme = "README.md"
 all-features = true
 
 [features]
-default = ["std", "futures_io"]
+default = ["std", "futures_io", "tokio_io"]
 std = ["alloc"]
 alloc = []
 futures_io = ["std", "futures-io/std"]
+tokio_io = ["std", "tokio"]
 
 [dependencies]
 either = { version = "1.6", default-features = false, optional = true }
 futures-util = { version = "0.3", default-features = false, optional = true }
 
 futures-io = { version = "0.3", default-features = false, optional = true }
+tokio = { version = "1.17", default-features = false, optional = true }
 
 [dev-dependencies]
 futures-executor = { version = "0.3" }
-tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.17", features = ["macros", "rt-multi-thread"] }
+
+[package.metadata.cargo-all-features]
+skip_optional_dependencies = true
