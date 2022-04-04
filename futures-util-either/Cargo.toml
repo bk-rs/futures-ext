@@ -1,0 +1,32 @@
+[package]
+name = "futures-util-either"
+version = "0.0.0"
+authors = ["vkill <vkill.net@gmail.com>"]
+edition = "2021"
+description = "futures_util::future::Either Ext"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/bk-rs/futures-ext"
+homepage = "https://github.com/bk-rs/futures-ext"
+documentation = "https://docs.rs/futures-util-either"
+keywords = []
+categories = []
+readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = ["std", "futures_io"]
+std = ["alloc"]
+alloc = []
+futures_io = ["std", "futures-io/std"]
+
+[dependencies]
+either = { version = "1.6", default-features = false, optional = true }
+futures-util = { version = "0.3", default-features = false, optional = true }
+
+futures-io = { version = "0.3", default-features = false, optional = true }
+
+[dev-dependencies]
+futures-executor = { version = "0.3" }
+tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
