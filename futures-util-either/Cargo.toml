@@ -31,7 +31,9 @@ tokio = { version = "1.17", default-features = false, optional = true }
 
 [dev-dependencies]
 futures-executor = { version = "0.3" }
-tokio = { version = "1.17", features = ["macros", "rt-multi-thread"] }
+futures-util = { version = "0.3", features = ["io"] }
+async-io = { version = "1.6" }
+tokio = { version = "1.17", features = ["macros", "rt-multi-thread", "net", "io-util"] }
 
 [package.metadata.cargo-all-features]
 skip_optional_dependencies = true
