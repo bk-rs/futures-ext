@@ -1,6 +1,6 @@
 [package]
 name = "futures-util-either"
-version = "0.0.0"
+version = "0.1.0"
 authors = ["vkill <vkill.net@gmail.com>"]
 edition = "2021"
 description = "futures_util::future::Either Ext"
