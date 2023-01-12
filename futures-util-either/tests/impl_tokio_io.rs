@@ -23,6 +23,7 @@ async fn rw() -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "std")]
 #[tokio::test]
 #[should_panic(expected = "No such file or directory")]
 async fn impl_tokio_io() {

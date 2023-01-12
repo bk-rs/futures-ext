@@ -218,6 +218,7 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "std")]
     #[tokio::test]
     async fn test_with_round_robin_and_right_long_sleep() {
         for (range, ret) in vec![
@@ -247,6 +248,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "std")]
     #[tokio::test]
     async fn test_with_round_robin_and_both_sleep() {
         for (range, ret_vec) in vec![
@@ -284,6 +286,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "std")]
     #[tokio::test]
     async fn test_with_round_robin_and_both_sleep_2() {
         for (range, ret_vec) in vec![
@@ -327,6 +330,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "std")]
     #[tokio::test]
     async fn test_with_right_right_left_and_both_sleep() {
         for (range, ret_vec) in vec![
