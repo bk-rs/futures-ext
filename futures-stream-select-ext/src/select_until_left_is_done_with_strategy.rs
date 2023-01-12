@@ -278,7 +278,7 @@ mod tests {
 
             let ret = st.collect::<Vec<_>>().await;
             #[cfg(feature = "std")]
-            println!("ret {:?}", ret);
+            println!("ret {ret:?}");
             assert!(ret_vec.contains(&ret));
 
             #[cfg(feature = "std")]
@@ -322,7 +322,7 @@ mod tests {
 
             let ret = st.collect::<Vec<_>>().await;
             #[cfg(feature = "std")]
-            println!("ret {:?}", ret);
+            println!("ret {ret:?}");
             assert!(ret_vec.contains(&ret));
 
             #[cfg(feature = "std")]
@@ -360,7 +360,7 @@ mod tests {
 
             let ret = st.collect::<Vec<_>>().await;
             #[cfg(feature = "std")]
-            println!("ret {:?}", ret);
+            println!("ret {ret:?}");
             assert!(ret_vec.contains(&ret));
 
             #[cfg(feature = "std")]
