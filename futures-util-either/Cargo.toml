@@ -23,7 +23,7 @@ futures_io = ["std", "futures-io/std"]
 tokio_io = ["std", "tokio"]
 
 [dependencies]
-either = { version = "1.6", default-features = false, optional = true }
+either = { version = "1", default-features = false, optional = true }
 futures-util = { version = "0.3", default-features = false, optional = true }
 
 futures-io = { version = "0.3", default-features = false, optional = true }
