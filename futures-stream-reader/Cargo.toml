@@ -1,0 +1,19 @@
+[package]
+name = "futures-stream-reader"
+version = "0.1.0"
+authors = ["vkill <vkill.net@gmail.com>"]
+edition = "2021"
+description = "Convert an [AsyncRead] into a [Stream] of byte chunks."
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/bk-rs/futures-ext"
+homepage = "https://github.com/bk-rs/futures-ext"
+documentation = "https://docs.rs/futures-stream-reader"
+keywords = []
+categories = []
+readme = "README.md"
+
+[dependencies]
+futures-util = { version = "0.3", default-features = false, features = ["io"] }
+
+[dev-dependencies]
+futures-executor = { version = "0.3" }
