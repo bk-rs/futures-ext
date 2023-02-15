@@ -96,7 +96,7 @@ mod tests {
     use futures_util::{stream, StreamExt as _};
 
     #[test]
-    fn test() {
+    fn simple() {
         futures_executor::block_on(async {
             for (range, ret) in vec![
                 (1..=1, vec![1, 0]),
