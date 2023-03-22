@@ -75,19 +75,22 @@ impl<R: AsyncRead> Stream for Decoder<R> {
                             this.buf.resize(data_len as usize, 0);
                         }
                         this.buf.rotate_left(field_len);
-
                         *this.n_read -= field_len;
 
                         *this.state = DecodeState::Data(data_len as usize);
+                        continue;
                     }
                 }
                 DecodeState::Data(data_len) => {
                     if *this.n_read >= data_len {
+                        let data = this.buf[..data_len].to_vec();
+
+                        this.buf.rotate_left(data_len);
                         *this.n_read -= data_len;
 
                         *this.state = DecodeState::Head;
 
-                        return Poll::Ready(Some(Ok(this.buf[..data_len].to_vec())));
+                        return Poll::Ready(Some(Ok(data)));
                     }
                 }
             }
@@ -99,11 +102,38 @@ impl<R: AsyncRead> Stream for Decoder<R> {
             {
                 Ok(n) => {
                     if n == 0 {
-                        return Poll::Ready(None);
+                        match *this.state {
+                            DecodeState::Head => {
+                                if *this.n_read == 0 {
+                                    return Poll::Ready(None);
+                                } else {
+                                    return Poll::Ready(Some(Err(IoError::new(
+                                        IoErrorKind::Other,
+                                        format!("need more head, n:{}", field_len - *this.n_read),
+                                    ))));
+                                }
+                            }
+                            DecodeState::Data(data_len) => {
+                                if *this.n_read == 0 {
+                                    return Poll::Ready(Some(Err(IoError::new(
+                                        IoErrorKind::Other,
+                                        "no data".to_string(),
+                                    ))));
+                                } else {
+                                    return Poll::Ready(Some(Err(IoError::new(
+                                        IoErrorKind::Other,
+                                        format!("need more data, n:{}", data_len - *this.n_read),
+                                    ))));
+                                }
+                            }
+                        }
                     }
                     *this.n_read += n;
                 }
-                Err(err) => return Poll::Ready(Some(Err(err))),
+                Err(err) => {
+                    //
+                    return Poll::Ready(Some(Err(err)));
+                }
             }
         }
     }
@@ -206,6 +236,40 @@ mod tests {
     use futures_util::{io::Cursor, SinkExt as _, StreamExt as _};
 
     #[test]
+    fn simple() -> Result<(), Box<dyn std::error::Error>> {
+        futures_executor::block_on(async {
+            let cursor: Cursor<Vec<u8>> = Cursor::new(vec![]);
+
+            let mut decoder = Decoder::new(cursor);
+            assert!(decoder.next().await.is_none());
+
+            let cursor = decoder.into_inner();
+
+            let mut encoder = Encoder::new(cursor);
+            encoder.send(&"abc").await?;
+            encoder.send(&"12").await?;
+            encoder.send(&[]).await?;
+
+            let mut cursor = encoder.into_inner();
+            cursor.set_position(0);
+
+            let mut decoder = Decoder::new(cursor);
+            assert_eq!(
+                decoder.next().await.ok_or("decoder.next() is_none")??,
+                b"abc"
+            );
+            assert_eq!(
+                decoder.next().await.ok_or("decoder.next() is_none")??,
+                b"12"
+            );
+            assert_eq!(decoder.next().await.ok_or("decoder.next() is_none")??, b"");
+            assert!(decoder.next().await.is_none());
+
+            Ok(())
+        })
+    }
+
+    #[test]
     fn test_decoder() -> Result<(), Box<dyn std::error::Error>> {
         futures_executor::block_on(async {
             let mut r: Cursor<Vec<u8>> = Cursor::new(vec![
@@ -217,6 +281,46 @@ mod tests {
             assert_eq!(
                 decoder.next().await.ok_or("decoder.next() is_none")??,
                 b"abc"
+            );
+            assert!(decoder.next().await.is_none());
+
+            let mut r: Cursor<Vec<u8>> = Cursor::new(vec![
+                0, 0, 0, 0, 0, 0, 0, 3, //
+                97, 98, 99, //
+                0, 0, 0,
+            ]);
+            r.set_position(0);
+            let mut decoder = Decoder::new(r);
+            assert_eq!(
+                decoder.next().await.ok_or("decoder.next() is_none")??,
+                b"abc"
+            );
+            match decoder.next().await {
+                Some(Err(err)) => {
+                    assert_eq!(err.kind(), IoErrorKind::Other);
+                    assert!(err.to_string().contains("need more head, n:5"));
+                }
+                x => panic!("{x:?}"),
+            };
+
+            let mut r: Cursor<Vec<u8>> = Cursor::new(vec![
+                0, 0, 0, 0, 0, 0, 0, 2, //
+                1, 2, //
+                0, 0, 0, 0, 0, 0, 0, 1, //
+                3, //
+                0, 0, 0, 0, 0, 0, 0, 3, //
+                4, 5, 6, //
+            ]);
+            r.set_position(0);
+            let mut decoder = Decoder::new(r);
+            assert_eq!(
+                decoder.next().await.ok_or("decoder.next() is_none")??,
+                &[1, 2]
+            );
+            assert_eq!(decoder.next().await.ok_or("decoder.next() is_none")??, &[3]);
+            assert_eq!(
+                decoder.next().await.ok_or("decoder.next() is_none")??,
+                &[4, 5, 6]
             );
             assert!(decoder.next().await.is_none());
 
