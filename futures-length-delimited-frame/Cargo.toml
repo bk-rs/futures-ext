@@ -1,7 +1,16 @@
 [package]
 name = "futures-length-delimited-frame"
 version = "0.1.0"
+authors = ["vkill <vkill.net@gmail.com>"]
 edition = "2021"
+description = "Frame a stream of bytes based on a length prefix"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/bk-rs/futures-ext"
+homepage = "https://github.com/bk-rs/futures-ext"
+documentation = "https://docs.rs/futures-length-delimited-frame"
+keywords = []
+categories = []
+readme = "README.md"
 
 [dependencies]
 futures-io = { version = "0.3", default-features = false }
