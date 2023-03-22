@@ -1,0 +1,14 @@
+[package]
+name = "futures-length-delimited-frame"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+futures-io = { version = "0.3", default-features = false }
+futures-core = { version = "0.3", default-features = false }
+futures-sink = { version = "0.3", default-features = false }
+pin-project-lite = { version = "0.2", default-features = false }
+
+[dev-dependencies]
+futures-util = { version = "0.3", features = ["io", "sink"] }
+futures-executor = { version = "0.3" }
