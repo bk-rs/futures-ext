@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "futures-length-delimited-frame",
     "futures-stream-reader",
     "futures-stream-select-ext",
     "futures-util-either",
