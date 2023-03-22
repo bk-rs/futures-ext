@@ -10,16 +10,107 @@ use futures_sink::Sink;
 use pin_project_lite::pin_project;
 
 //
+//
+//
 pin_project! {
     #[derive(Debug)]
     pub struct Decoder<R> {
         #[pin]
-        reader: R,
+        inner: R,
         buf: Vec<u8>,
         n_read: usize,
+        state: DecodeState,
     }
 }
 
+impl<R: AsyncRead> Decoder<R> {
+    pub fn new(inner: R) -> Self {
+        Self::with_capacity(1024, inner)
+    }
+
+    pub fn with_capacity(cap: usize, inner: R) -> Self {
+        Self {
+            inner,
+            buf: vec![0; cap],
+            n_read: 0,
+            state: DecodeState::Head,
+        }
+    }
+
+    pub fn get_ref(&self) -> &R {
+        &self.inner
+    }
+
+    pub fn get_mut(&mut self) -> &mut R {
+        &mut self.inner
+    }
+
+    pub fn into_inner(self) -> R {
+        self.inner
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum DecodeState {
+    Head,
+    Data(usize),
+}
+
+impl<R: AsyncRead> Stream for Decoder<R> {
+    type Item = Result<Vec<u8>, IoError>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+
+        let field_len = core::mem::size_of::<u64>();
+
+        loop {
+            match *this.state {
+                DecodeState::Head => {
+                    if *this.n_read >= field_len {
+                        let data_len =
+                            u64::from_be_bytes(this.buf[..field_len].try_into().expect("Never"));
+
+                        if this.buf.len() < data_len as usize {
+                            this.buf.resize(data_len as usize, 0);
+                        }
+                        this.buf.rotate_left(field_len);
+
+                        *this.n_read -= field_len;
+
+                        *this.state = DecodeState::Data(data_len as usize);
+                    }
+                }
+                DecodeState::Data(data_len) => {
+                    if *this.n_read >= data_len {
+                        *this.n_read -= data_len;
+
+                        *this.state = DecodeState::Head;
+
+                        return Poll::Ready(Some(Ok(this.buf[..data_len].to_vec())));
+                    }
+                }
+            }
+
+            match ready!(this
+                .inner
+                .as_mut()
+                .poll_read(cx, &mut this.buf[*this.n_read..]))
+            {
+                Ok(n) => {
+                    if n == 0 {
+                        return Poll::Ready(None);
+                    }
+                    *this.n_read += n;
+                }
+                Err(err) => return Poll::Ready(Some(Err(err))),
+            }
+        }
+    }
+}
+
+//
+//
 //
 pin_project! {
     #[derive(Debug)]
@@ -32,7 +123,7 @@ pin_project! {
 
 impl<W: AsyncWrite> Encoder<W> {
     pub fn new(inner: W) -> Self {
-        Self::with_capacity(2048, inner)
+        Self::with_capacity(1024, inner)
     }
 
     pub fn with_capacity(cap: usize, inner: W) -> Self {
@@ -71,9 +162,9 @@ impl<T: AsRef<[u8]>, W: AsyncWrite> Sink<T> for Encoder<W> {
         let this = self.project();
 
         let data = item.as_ref();
-        let length = data.len() as u64;
+        let data_len = data.len() as u64;
 
-        this.buf.extend_from_slice(length.to_be_bytes().as_ref());
+        this.buf.extend_from_slice(data_len.to_be_bytes().as_ref());
         this.buf.extend_from_slice(data);
 
         Ok(())
@@ -91,6 +182,7 @@ impl<T: AsRef<[u8]>, W: AsyncWrite> Sink<T> for Encoder<W> {
                 return Poll::Ready(Err(IoErrorKind::WriteZero.into()));
             }
         }
+        this.buf.clear();
 
         ready!(this.inner.as_mut().poll_flush(cx))?;
 
@@ -111,14 +203,59 @@ impl<T: AsRef<[u8]>, W: AsyncWrite> Sink<T> for Encoder<W> {
 mod tests {
     use super::*;
 
-    use futures_util::{io::Cursor, SinkExt as _};
+    use futures_util::{io::Cursor, SinkExt as _, StreamExt as _};
 
     #[test]
-    fn test_encoder() {
+    fn test_decoder() -> Result<(), Box<dyn std::error::Error>> {
         futures_executor::block_on(async {
-            {
-                let w: Cursor<Vec<u8>> = Cursor::new(vec![]);
-            }
+            let mut r: Cursor<Vec<u8>> = Cursor::new(vec![
+                0, 0, 0, 0, 0, 0, 0, 3, //
+                97, 98, 99, //
+            ]);
+            r.set_position(0);
+            let mut decoder = Decoder::new(r);
+            assert_eq!(
+                decoder.next().await.ok_or("decoder.next() is_none")??,
+                b"abc"
+            );
+            assert!(decoder.next().await.is_none());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_encoder() -> Result<(), Box<dyn std::error::Error>> {
+        futures_executor::block_on(async {
+            let w: Cursor<Vec<u8>> = Cursor::new(vec![]);
+            let mut encoder = Encoder::new(w);
+            encoder.send(&"abc").await?;
+            assert_eq!(
+                encoder.into_inner().get_ref(),
+                &[
+                    0, 0, 0, 0, 0, 0, 0, 3, //
+                    97, 98, 99, //
+                ]
+            );
+
+            let w: Cursor<Vec<u8>> = Cursor::new(vec![]);
+            let mut encoder = Encoder::new(w);
+            encoder.send(&[1, 2]).await?;
+            encoder.send(&[3]).await?;
+            encoder.send(vec![4, 5, 6]).await?;
+            assert_eq!(
+                encoder.into_inner().get_ref(),
+                &[
+                    0, 0, 0, 0, 0, 0, 0, 2, //
+                    1, 2, //
+                    0, 0, 0, 0, 0, 0, 0, 1, //
+                    3, //
+                    0, 0, 0, 0, 0, 0, 0, 3, //
+                    4, 5, 6, //
+                ]
+            );
+
+            Ok(())
         })
     }
 }
